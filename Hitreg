@@ -1,0 +1,264 @@
+import math
+import random
+
+
+class Vec2D:
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def isequal(self):
+        return self.x == self.y
+
+    def sign(self):
+        return abs(self) / self
+
+    def test_signs(self, signs):
+        return self.sign() == signs
+
+    def either(self, num):
+        return (self.x == num or self.y == num) and not self.x == self.y
+
+    def __add__(self, other):
+        try:
+            return Vec2D(
+                self.x + other.x,
+                self.y + other.y)
+        except:
+            raise ValueError("cannot add non type vec2d to vec2d")
+    __radd__ = __add__
+
+    def __sub__(self, other):
+        try:
+            return Vec2D(
+                self.x - other.x,
+                self.y - other.y)
+        except:
+            raise ValueError("cannot sub non type vec2d from vec2d")
+
+    def __mul__(self, other):
+        try:
+            return Vec2D(
+                self.x * other.x,
+                self.y * other.y)
+        except:
+            raise ValueError("cannot multiply non type vec2d with vec2d")
+
+    def __truediv__(self, other):
+        try:
+            return Vec2D(
+                self.x / other.x,
+                self.y / other.y)
+        except:
+            raise ValueError("cannot divide non type vec2d by vec2d")
+
+    def __floordiv__(self, other):
+        try:
+            return Vec2D(
+                self.x // other.x,
+                self.y // other.y)
+        except:
+            raise ValueError("cannot divide non type vec2d by vec2d")
+
+    def __str__(self):
+        return "x: {0.x}, y: {0.y}".format(self)
+
+    def __mod__(self, other):
+        '''modulus, avoids modulus by 0 by returning 0'''
+        return Vec2D(self.x % other.x if other.x else 0, self.y % other.y if other.y else 0)
+
+    def __contains__(self, item):
+        return self.x in range(item.x + 1) and self.y in range(item.y + 1)
+
+    def __not__(self):
+        return not (self.x and self.y)
+
+    def __bool__(self):
+        return bool(self.x and self.y)
+
+    def __lt__(self, other):
+        return self.x < other.x and self.y < other.y
+
+    def __gt__(self, other):
+        return self.x > other.x and self.y > other.y
+
+    def __le__(self, other):
+        return self.x <= other.x and self.y <= other.y
+
+    def __ge__(self, other):
+        return self.x >= other.x and self.y >= other.y
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __abs__(self):
+        return Vec2D(abs(self.x), abs(self.y))
+
+
+class Tri:
+    """Contains 3 Vec2D objects"""
+
+    def __init__(self, p1, p2, p3):
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+
+    def __str__(self):
+        return "1: ({0.p1}), 2: ({0.p2}), 3: ({0.p3})".format(self)
+
+    @staticmethod
+    def sign(p1, p2, p3):
+        '''input = vec2s for each point'''
+        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
+    def contains(self, Vector):
+        '''Check if a vector is inside this triangle'''
+        b1 = self.sign(Vector, self.p1, self.p2) < 0.0
+        b2 = self.sign(Vector, self.p2, self.p3) < 0.0
+        b3 = self.sign(Vector, self.p3, self.p1) < 0.0
+        return ((b1 == b2) and (b2 == b3))
+
+    def __add__(self, other):
+        try:
+            return Tri(
+                self.p1 + other.p1,
+                self.p2 + other.p2,
+                self.p3 + other.p3)
+        except:
+            raise ValueError("cannot add non type Tri to Tri")
+    __radd__ = __add__
+
+
+class AsteroidPoint:
+    """Stores a point of an asteroid"""
+
+    def __init__(self, angle, offset):
+        self.angle = angle
+        self.offset = offset
+
+    @property
+    def position(self):
+        return Vec2D(math.sin(math.radians(self.angle)) * self.offset, math.cos(math.radians(self.angle)) * self.offset)
+
+    def rotate(self, rotation):
+        return AsteroidPoint((self.angle + rotation) % 360, self.offset)
+
+
+class Asteroid:
+    """Object that stores the properties of an Asteroid
+    
+    Properties
+    ----------
+    
+    true_loc <- the calculated location of the asteroid (origin + offset)
+    
+    true_points <- generator of each point, rotated by the asteroid rotation
+    
+    points_as_xy <- generator of each point, rotated and converted to cartesiean coords (usable for drawing the Asteroid)
+    
+    triangles <- list of triangles in the Asteroid
+    
+    
+    Functions
+    ---------
+    
+    translate(offset: Vec2D) <- translate the asteroid by a vector
+    
+    rotate(offset: Number) <- rotate the shape by offset
+    
+    contains(vector: Vec2D) <- returns true if vector is inside the asteroid, otherwise false
+    """
+
+    def __init__(self, origin, points):
+        self.origin = origin
+        self.offset = Vec2D(0, 0)
+        self.rotation = 0
+        self.points = sorted(points, key=lambda x: x.angle)
+
+    def __str__(self):
+        return "{0}: location: {1.true_loc}".format(type(self), self)
+
+    def translate(self, offset):
+        self.offset += offset
+
+    def rotate(self, offset):
+        self.rotation += offset
+        self.rotation %= 360
+
+    def contains(self, vector):
+        return any((i.contains(vector) for i in self.triangles))
+
+    @property
+    def true_loc(self):
+        """Returns origin translated by offset"""
+        return self.origin + self.offset
+
+    @property
+    def true_points(self):
+        """Returns list generator of own points, rotated by rotation"""
+        for i in self.points:
+            yield i.rotate(self.rotation)
+
+    @property
+    def points_as_xy(self):
+        for i in self.true_points:
+            yield self.true_loc + i.position
+
+    @property
+    def triangles(self):
+        triangles = []
+        points = list(self.points_as_xy)
+        for i, k in zip(points, points[-1:] + points[:-1]):
+            triangles.append(Tri(self.origin, i, k))
+        return triangles
+
+
+def generate_asteroid(location_range=[Vec2D(100, 100), Vec2D(-100, -100)],
+                      offset_range=[5, 8],
+                      points_range=[5, 10]) -> Asteroid:
+    """Generates an asteroid
+
+    Parameters
+    ----------
+
+    location_range <- square to generate asteroids in (top left, bottom right)
+    
+    offset_range <- range of values to offset the points bytes (min, max)
+    
+    points_range <- range to select a number of points from (min, max)
+
+
+    Returns
+    -------
+
+    An Hitreg.Asteroid object conforming to the properties
+    """
+
+    position_x = random.randrange(location_range[1].x, location_range[0].x) + random.random()
+    position_y = random.randrange(location_range[1].y, location_range[0].y) + random.random()
+
+    origin = Vec2D(position_x, position_y)
+
+
+    points = (AsteroidPoint(i, random.randrange(*offset_range) + random.random()) for i in range(0, 360, 360//random.randint(*points_range)))
+
+    return Asteroid(origin, points)
+
+    
+
+
+if __name__ == "__main__":
+    points = [AsteroidPoint(i, random.randint(3, 5))
+              for i in range(0, 360, 360 // random.randint(4, 20))]
+    asteroid = Asteroid(Vec2D(0, 0), points)
+    print([str(i) for i in asteroid.triangles])
+
+    print("0,0 is inside asteroid? {}".format(asteroid.contains(Vec2D(0, 0))))
+    print("1000,1000 is inside asteroid? {}".format(
+        asteroid.contains(Vec2D(1000, 1000))))
+
+    asteroids = [generate_asteroid() for i in range(100)]
+
+    for i in asteroids:
+        print(i)
